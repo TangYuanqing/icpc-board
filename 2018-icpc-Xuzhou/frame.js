@@ -30,39 +30,33 @@ function showCountdown(timeStr) {
         setPage($.lastPage);
     });
 }
+function showCountdownNow(afterPage) {
+    var timeStr = new Date().Format('yyyy-MM-dd hh:mm:ss');
+    timeRun(timeStr,
+        function () {
+            setPage('countdown10.html');
+        });
+    var end = new Date(new Date(timeStr).getTime() + 14000).Format('yyyy-MM-dd hh:mm:ss');
+    timeRun(end,
+        function () {
+            setPage(afterPage ? afterPage : $.lastPage);
+        });
+}
 
 function now(){
     var time=new Date().getTime()+$.timespan;
     return new Date(time);
 }
 function refreshTime() {
-    $.get('handler/gettime.ashx', function (r) {
-        var serverTime = new Date(r);
-        if (r.time) {
-            $.timespan = new Date(r.time).getTime() - new Date().getTime();
-        }
-    })
+    $.get('handler/gettime.ashx',
+        function(r) {
+            var serverTime = new Date(r);
+            if (r.time) {
+                $.timespan = new Date(r.time).getTime() - new Date().getTime();
+            }
+        });
 }
 
 function refreshParent() {
     parent.top.refresh();
 }
-$(function () {
-    //$('#mainFrame').attr('src', 'board.html');
-
-    refreshPage();
-    setInterval(refreshPage, 2000);
-    setInterval(refreshTime,10000);
-
-    setTimeout(() => {
-        $.lastPage = "board.html";
-        // showCountdown('2018-6-3 08:59:50');
-        // timeRun('2018-6-3 09:00:05', function () {
-        //    setPage('board.html');       
-        // });
-        showCountdown('2018-10-9 00:02:00');
-        timeRun('2018-10-9 00:02:15', function () {
-           setPage('board.html');       
-        });            
-    }, 10000);
-})

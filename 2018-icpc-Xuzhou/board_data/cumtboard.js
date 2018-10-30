@@ -7,7 +7,7 @@ function GenerateTable() {
         function (index, item) {
             table.find('.problemGroup').append('<col class="scoreprob" />');
             table.find('thead tr')
-                .append("<th title=\"problem '{name}'\"scope='col'><a>{label} <div class='circle' style='background-color: {color};'></div></a></th>".Format(item));
+                .append("<th title=\"problem '{Name}'\"scope='col'><a>{Letter} <div class='circle' style='background-color: {RGB};'></div></a></th>".Format(item));
             table.find('tbody.summary tr')
                 .append(' <td style="text-align: left;" class="tdSumP">' +
                     '<span class="octicon octicon-thumbsup"> </span>' +
@@ -32,7 +32,7 @@ function ComputeSummary() {
             var minTime = 10000;
             scoreData.forEach(function(x) {
                 x.problems.map(function (t) {
-                    if (t.label == p.label) {
+                    if (t.label == p.Letter) {
                         if (t.solved) {
                             totalSolved++;
                             siteSolved++;
@@ -60,48 +60,51 @@ function showScoreData() {
 
     var strRowTeam = '<tr id="team:{id}">' +
     '<td class="scorepl">{rank}</td>' +
-    '<td class="scoreaf">&nbsp;{school}</td>' +
-    '<td class="scoretn"><span class="teamName">{cname}</span><br><span class="teamEName">({name})</span></td>' +
+    '<td class="scoreaf"><img src="picture/{Icon}.png" alt="" title="{School}" width="32" height="32" />&nbsp;{School}</td>' +
+    '<td class="scoretn"><span class="teamName">{Name}</span><br><span class="teamEName">({NameEn})</span></td>' +
     '<td class="scorenc">{num_solved}</td>' +
     '<td class="scorett">{total_time}</td>   </tr>';
 
     var strCellwrap = '<td class="score_cell"></td>';
-    //if
     var strCelldiv = '<div >{time}<span>{num_judged} tries</span></div>';
 
     var scoreBody = $("<tbody></tbody>");
-    if (!$.board)
+    if (!scoreData)
         return;
+
+    //计算队伍数
+    var teamCount = teams.length;
+    for (var i = 0; i < teams.length; i++) {
+        if (teams[i].Star)
+            teamCount--;
+    }
+    
 
   
     var medalCount = 0;
-    for (var index = 0; index < $.board.length; index++) {
-        var item = $.board[index];
+    for (var index = 0; index < scoreData.length; index++) {
+        var item = scoreData[index];
 
 
         var team = teams.find((n) => n.id == item.team);//挑出队伍
         try {
-	    item.rank--;
             var combine = CombineObject(CombineObject(team, item.score), item);
             //if (!combine)
             //    console.log(team,item);
             var scoreRow = $(strRowTeam.Format(combine));
-            if (team.memo.indexOf('*') >= 0) //加星队伍
+            if (team.Star)//if (team.memo && team.memo.indexOf('*') >= 0) //加星队伍
                 scoreRow.find('.scoretn').prepend('<i class="fa fa-star starTeam"></i>');
-            if (team.memo.indexOf('Female') >= 0) //女队
-{
-		scoreRow.find('.scoretn').prepend('<i class="fa fa-star starTeam"></i>');
+            if (team.memo && team.memo.indexOf('Female') >= 0) //女队
                 scoreRow.find('.teamName').addClass('teamFemale');
-	}
 
             if ($.giveMedal) {
                 var medalName="";
-                if (team.memo.indexOf('*') < 0) {
-                    if (medalCount < 31)
+                if (!team.Star ) { //if (team.memo==undefined || team.memo.indexOf('*') < 0) {
+                    if (medalCount < parseInt(teamCount*0.1))
                         medalName = "gold";
-                    else if (medalCount < (31 + 62))
+                    else if (medalCount < parseInt(teamCount*0.3))
                         medalName = "silver";
-                    else if (medalCount < (31 + 62 + 93))
+                    else if (medalCount < parseInt(teamCount*0.6))
                         medalName = "bronze";
                     scoreRow.find('.scorepl').addClass(medalName);
                     medalCount++;
@@ -140,17 +143,49 @@ function showScoreData() {
 }
 
 var Config = {
-    getProblemSet: function () {
+    getProblemSet: function (func) {
         if ($.problemSet)
             return $.problemSet;
         else
-            return ($.ProblemSet = readCSV('html/problemSet.csv'));
+        //return ($.ProblemSet = readCSV('html/problemSet.csv'));
+        {
+            
+            $.ajax({
+                type: 'GET',
+                dataType: 'json',
+                url: "handler/GetData.ashx?table=problem",
+                async: typeof func == 'function',
+                success: function(r) {
+                    $.problemSet= r;
+                },
+                fail: function(r) {
+                    console.log(r);
+                }
+            });
+            return $.problemSet;
+        }
     },
-    getTeams: function () {
+    getTeams: function (func) {
         if ($.teams)
             return $.teams;
         else
-            return ($.teams = readCSV('html/teams.csv'));
+        //return ($.teams = readCSV('html/teams.csv'));
+        {
+            var ret;
+            $.ajax({
+                type: 'GET',
+                dataType: 'json',
+                url: "handler/GetData.ashx?table=team",
+                async: typeof func == 'function',
+                success: function (r) {
+                    ret = r;
+                },
+                fail: function (r) {
+                    console.log(r);
+                }
+            });
+            return ret;
+        }
     },
     getBoard: function () {
         if ($.board)
@@ -192,13 +227,39 @@ function updateBoard() {
     if (!$.refreshData)
         return;
     $.get('handler/updatedata.ashx',
-        function (r) {
+        function(r) {
             if (typeof r == 'string')
                 $.board = JSON.parse(r);
-            else 
-            $.board = r;
+            else
+                $.board = r;
             showScoreData();
         });
+    $.get('handler/updatedata.ashx?question=CheckFreeze',
+   
+        function (r) {
+            var result;
+            if (typeof r == 'string')
+                result = JSON.parse(r);
+            else
+                result = r;
+       
+                showPending(result.result);
+        });
+}
+function showPending(show) {
+    if (show == undefined)
+        show = true;
+    if ($('#pending').prop('visible') != show) {
+        if (show) {
+
+            $('#pending').show();
+            console.log('封榜');
+        } else {
+
+            $('#pending').hide();
+            console.log('解除封榜');
+        }
+    }
 }
 
 function now(){
@@ -207,23 +268,35 @@ function now(){
 }
 
 $(function () {
-    $.giveMedal = true;
-    $.refreshData=false;
+    
+    //$('html').addClass('loading');
+    console.log('Generating table');
 
     GenerateTable();
     showScoreData();
     ComputeSummary();
-    
+    console.log('table shown');
+    $('html').removeClass('loading');
+    setTimeout(function() {
+        $('.loading-container').hide();
+    },0);
+
+    if ($.refreshData)
+        $('#showBalloon').parent().show();
 
     //var teams = Config.getTeams();
     //$.each(teams,
     //    function(index, item) {
-    //        $('#test').append('<div><img src="picture/' + item.icon + '.jpg" />' + item.school + '</div>');
+    //        $('#test').append('<div><img src="picture/' + item.icon + '.png" />' + item.school + '</div>');
     //    });
-    updateBoard();
     setInterval(updateBoard, 10000);
     $.autoScroll = $('#autoscroll').prop('checked');
-    $('#autoscroll').click(function () {
+    autoScroll();
+    $('#autoscroll').click(function() {
         $.autoScroll = $('#autoscroll').prop('checked');
-    })
+    });
+    $.showBalloon = $('#showBalloon').prop('checked');
+    $('#showBalloon').click(function () {
+        $.showBalloon = $('#showBalloon').prop('checked');
+    });
 })
